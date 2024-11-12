@@ -1,0 +1,23 @@
+{% extends "template.html" %}
+{% block conteudo %}
+<table class="table table-striped table-responsive table-bordered">
+<thead class="thead-default">
+    <tr>
+        <th>Nome</th>
+        <th>Ano de Lançamento</th>
+        <th>Plataformas</th>
+        <th>Categoria</th>
+    </tr>
+</thead>
+<tbody>
+    {% for jogo in jogos %}
+    <tr>
+        <td>{{ jogo.nome }}</td>
+        <td>{{ jogo.ano_lancamento }}</td>
+        <td>{{ ', '.join(jogo.plataformas) }}</td>
+        <td>{{ jogo.categoria }}</td>
+    </tr>
+    {% endfor %}
+</tbody>
+</table>
+{% endblock %}
