@@ -69,7 +69,7 @@ def editar(id):
     else:
         flash('Jogo não encontrado!', category='error')
         return redirect(url_for('index'))
-
+    
 @app.route('/atualizar', methods=['POST'])
 def atualizar():
     jogo_id = request.form.get('id')
@@ -83,4 +83,18 @@ def atualizar():
         flash('Jogos atualizados!')
     else:
         flash('Jogo não encontrado!', category='error')
+    return redirect(url_for('index'))
+
+@app.route('/deletar/<int:id>')
+def deletar(id):
+    if 'usuario_logado' not in session or session['usuario_logado'] == None:
+        return redirect(url_for('login'))
+    try:
+        Jogos.query.filter_by(id=id).delete()
+        db.session.commit()
+        flash('Jogo deletado com sucesso!')
+    except:
+        db.session.rollback()
+        flash('Não foi possível excluir o jogo', category='error')
+
     return redirect(url_for('index'))
