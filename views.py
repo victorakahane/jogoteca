@@ -80,8 +80,7 @@ def atualizar():
         jogo.console = request.form.get('console')
         db.session.add(jogo)
         db.session.commit()
+        flash('Jogos atualizados!')
     else:
         flash('Jogo não encontrado!', category='error')
-    
-    flash('Jogos atualizados!')
     return redirect(url_for('index'))
