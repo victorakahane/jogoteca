@@ -21,7 +21,7 @@ def cadastrar_jogo():
     
     if Jogos.query.filter_by(nome=nome).first():
         flash('Jogo já cadastrado', category='error')
-        return redirect(url_for('novo')) 
+        return redirect(url_for('retornar_pagina_cadastro')) 
     else:
         db.session.add(Jogos(nome=nome, categoria=categoria, console=console))
         db.session.commit()
