@@ -57,3 +57,31 @@ def fazer_logout():
     session['usuario_logado'] = None
     flash('Logout efetuado com sucesso!')
     return redirect(url_for('index'))
+
+@app.route('/editar/<int:id>')
+def editar(id):
+    jogo = Jogos.query.filter_by(id=id).first()
+
+    if 'usuario_logado' not in session or session['usuario_logado'] is None:
+        return redirect(url_for('fazer_login', proxima=url_for('editar', id=id)))
+    if jogo:
+        return render_template('editar.html', jogo=jogo)
+    else:
+        flash('Jogo não encontrado!', category='error')
+        return redirect(url_for('index'))
+
+@app.route('/atualizar', methods=['POST'])
+def atualizar():
+    jogo_id = request.form.get('id')
+    jogo = Jogos.query.filter_by(id=jogo_id).first()
+    if jogo:
+        jogo.nome = request.form.get('nome')
+        jogo.categoria = request.form.get('categoria')
+        jogo.console = request.form.get('console')
+        db.session.add(jogo)
+        db.session.commit()
+    else:
+        flash('Jogo não encontrado!', category='error')
+    
+    flash('Jogos atualizados!')
+    return redirect(url_for('index'))
