@@ -1,6 +1,7 @@
-from flask import render_template, request, redirect, session, flash, url_for
+from flask import render_template, request, redirect, session, flash, url_for, send_from_directory
 from main import app, db
 from models import Jogos, Usuarios
+import os
 
 @app.route('/')
 def index():
@@ -18,14 +19,32 @@ def cadastrar_jogo():
     nome = request.form.get('nome')
     console = request.form.get('console')
     categoria = request.form.get('categoria')
-    
+    arquivo = request.files.get('arquivo')
+
+    if not arquivo:
+        flash('Nenhum arquivo foi enviado.', category='error')
+        return redirect(url_for('novo'))
+
+    arquivo_extensao = os.path.splitext(arquivo.filename)[1]
+
+    if not arquivo.filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+        flash('Formato de arquivo inválido. Envie uma imagem.', category='error')
+        return redirect(url_for('novo'))
+
     if Jogos.query.filter_by(nome=nome).first():
         flash('Jogo já cadastrado', category='error')
-        return redirect(url_for('retornar_pagina_cadastro')) 
-    else:
-        db.session.add(Jogos(nome=nome, categoria=categoria, console=console))
-        db.session.commit()
+        return redirect(url_for('novo'))
 
+    novo_jogo = Jogos(nome=nome, categoria=categoria, console=console)
+
+    # Salvar no banco de dados
+    db.session.add(novo_jogo)
+    db.session.commit()
+
+    # Salvar o arquivo
+    arquivo.save(os.path.join(app.config.get('UPLOAD_FOLDER'), f'capa{novo_jogo.id}{arquivo_extensao}'))
+
+    flash('Jogo cadastrado com sucesso!', category='success')
     return redirect(url_for('index'))
 
 @app.route('/login')
@@ -45,13 +64,13 @@ def autenticar():
             proxima_pagina = request.form.get('proxima')
             flash(f'Usuário logado com sucesso: {session["usuario_logado"]}')
             return redirect(proxima_pagina)
-        else:
-            flash(f'Senha incorreta, tente novamente')
-            return redirect(url_for('fazer_login'))
+
+        flash('Senha incorreta, tente novamente')
+        return redirect(url_for('fazer_login'))
     else:
         flash('Usuário não cadastrado, tente novamente')
         return redirect(url_for('fazer_login'))
-    
+
 @app.route('/logout')
 def fazer_logout():
     session['usuario_logado'] = None
@@ -98,3 +117,7 @@ def deletar(id):
         flash('Não foi possível excluir o jogo', category='error')
 
     return redirect(url_for('index'))
+
+@app.route('/uploads/<nome_arquivo>')
+def imagem(nome_arquivo):
+    return send_from_directory('uploads', nome_arquivo)
