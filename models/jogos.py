@@ -5,7 +5,7 @@ class Jogos(db.Model):
     nome = db.Column(db.String(50), nullable=False)
     categoria = db.Column(db.String(40), nullable=False)
     console = db.Column(db.String(20), nullable=False)
-    caminho_capa = db.Column(db.String(130), nullable=True, default='capa_padrao.jpg')
+    caminho_capa = db.Column(db.String(130), nullable=True)
 
     def __repr__(self):
         return '<Name %r>' % self.name
