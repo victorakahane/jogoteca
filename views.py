@@ -1,4 +1,6 @@
 from flask import render_template, request, redirect, session, flash, url_for, send_from_directory, abort
+from helpers import FormularioJogo, FormularioUsuario
+from flask_wtf import FlaskForm
 from main import app, db
 from models import Jogos, Usuarios
 import os
@@ -12,23 +14,27 @@ def index():
 def retornar_pagina_cadastro():
     if 'usuario_logado' not in session or session['usuario_logado'] is None:
         return redirect(url_for('fazer_login', proxima=url_for('retornar_pagina_cadastro')))
-    return render_template('cadastrar.html', titulo='Cadastro de Jogo')
+    form = FormularioJogo()
+    return render_template('cadastrar.html', titulo='Novo Jogo', form=form) 
 
 @app.route('/cadastrar', methods=['POST'])
 def cadastrar_jogo():
-    nome = request.form.get('nome')
-    console = request.form.get('console')
-    categoria = request.form.get('categoria')
-    arquivo = request.files.get('arquivo')
-
-    # Validações básicas
-    if not nome or not console or not categoria:
+    form: type[FlaskForm] = FormularioJogo(request.form)
+    
+    if not form.validate_on_submit():
         flash('Preencha todos os campos obrigatórios.', category='error')
-        return redirect(url_for('novo'))
-
+        return redirect(url_for('retornar_pagina_cadastro'))
+    
+    nome = form.nome.data
+    console = form.console.data
+    categoria = form.categoria.data
+    arquivo = request.files.get('foto')
+    print(arquivo)
+    
+    
     if Jogos.query.filter_by(nome=nome).first():
         flash('Jogo já cadastrado.', category='error')
-        return redirect(url_for('novo'))
+        return redirect(url_for('retornar_pagina_cadastro'))
 
     # Criação do objeto do jogo
     novo_jogo = Jogos(nome=nome, categoria=categoria, console=console)
@@ -37,14 +43,14 @@ def cadastrar_jogo():
 
     if arquivo and arquivo.filename:
         # Validar extensão do arquivo
-        arquivo_extensao = os.path.splitext(arquivo.filename)[1].lower()
-        if arquivo_extensao not in ['.png', '.jpg', '.jpeg']:
-            flash('Formato de arquivo inválido. Envie uma imagem PNG, JPG ou JPEG.', category='error')
-            db.session.rollback()
-            return redirect(url_for('novo'))
+        # arquivo_extensao = os.path.splitext(arquivo.filename)[1].lower()
+        # if arquivo_extensao not in ['.png', '.jpg', '.jpeg']:
+        #     flash('Formato de arquivo inválido. Envie uma imagem PNG, JPG ou JPEG.', category='error')
+        #     db.session.rollback()
+        #     return redirect(url_for('retornar_pagina_cadastro'))
 
         # Gerar nome único para o arquivo
-        nome_arquivo = f'capa_{novo_jogo.id}{arquivo_extensao}'
+        nome_arquivo = f'capa_{novo_jogo.id}.jpg'
         caminho_arquivo = os.path.join(app.config['UPLOAD_FOLDER'], nome_arquivo)
 
         # Salvar o arquivo
@@ -60,12 +66,14 @@ def cadastrar_jogo():
 @app.route('/login')
 def fazer_login():
     proxima = request.args.get('proxima', url_for('index'))
-    return render_template('login.html', proxima=proxima)
+    form = FormularioUsuario()
+    return render_template('login.html', proxima=proxima, form=form)
 
 @app.route('/autenticar', methods=['POST'])
 def autenticar():
-    input_usuario = request.form.get('usuario')
-    input_senha = request.form.get('senha')
+    form: type[FlaskForm] = FormularioUsuario(request.form)
+    input_usuario = form.nickname.data
+    input_senha = form.senha.data
     usuario = Usuarios.query.filter_by(nickname=input_usuario).first()
 
     if usuario:
@@ -90,39 +98,45 @@ def fazer_logout():
 @app.route('/editar/<int:id>')
 def editar(id):
     jogo = Jogos.query.filter_by(id=id).first()
+    form = FormularioJogo()
+    form.nome.data = jogo.nome
+    form.categoria.data = jogo.categoria
+    form.console.data = jogo.console
+    form.foto.data = jogo.caminho_capa
     if 'usuario_logado' not in session or session['usuario_logado'] is None:
         return redirect(url_for('fazer_login', proxima=url_for('editar', id=id)))
     if jogo:
-        return render_template('editar.html', jogo=jogo)
-    else:
-        flash('Jogo não encontrado!', category='error')
-        return redirect(url_for('index'))
+        return render_template('editar.html', form=form, id=id)
+    
+    flash('Jogo não encontrado!', category='error')
+    return redirect(url_for('index'))
     
 @app.route('/atualizar', methods=['POST'])
 def atualizar():
+    form: type[FlaskForm] = FormularioJogo(request.form)
     jogo_id = request.form.get('id')
     jogo = Jogos.query.filter_by(id=jogo_id).first()
-    arquivo = request.files.get('arquivo')
-    if jogo:
-        jogo.nome = request.form.get('nome')
-        jogo.categoria = request.form.get('categoria')
-        jogo.console = request.form.get('console')
-        if arquivo and arquivo.filename:
-            arquivo_extensao = os.path.splitext(arquivo.filename)[1].lower()
-            if arquivo_extensao not in ['.png', '.jpg', '.jpeg']:
-                flash('Formato de arquivo inválido. Envie uma imagem PNG, JPG ou JPEG.', category='error')
-                return redirect(url_for('editar', id=jogo_id))
-
-            nome_arquivo = f'capa_{jogo.id}.jpg'
-            caminho_arquivo = os.path.join(app.config['UPLOAD_FOLDER'], nome_arquivo)
-            arquivo.save(caminho_arquivo)
-            jogo.caminho_capa = nome_arquivo
-        
-        db.session.add(jogo)
-        db.session.commit()
-        flash('Jogos atualizados!')
-    else:
+    
+    if not jogo:
         flash('Jogo não encontrado!', category='error')
+        return redirect(url_for('index'))
+    if not form.validate_on_submit():
+        flash('Informações inváidas!', category='error')
+        return redirect(url_for('editar', id=jogo_id))
+    
+    arquivo = request.files.get('foto')
+    jogo.nome = form.nome.data
+    jogo.categoria = form.categoria.data
+    jogo.console = form.console.data
+    if arquivo and arquivo.filename:
+        nome_arquivo = f'capa_{jogo.id}.jpg'
+        caminho_arquivo = os.path.join(app.config['UPLOAD_FOLDER'], nome_arquivo)
+        arquivo.save(caminho_arquivo)
+        jogo.caminho_capa = nome_arquivo
+    
+    db.session.add(jogo)
+    db.session.commit()
+    flash('Jogos atualizados!')
     return redirect(url_for('index'))
 
 @app.route('/deletar/<int:id>')
