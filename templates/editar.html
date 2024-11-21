@@ -1,21 +1,34 @@
 {% extends "template.html" %}
 {% block conteudo %}
-<form action="{{url_for('atualizar')}}" method="post">
+<form action="{{url_for('atualizar')}}" method="post" enctype="multipart/form-data" class="formularioJogo">
+    <figure class="img thumbnail col-md-4 formularioImagem">
+        <img class="img-fluid" src="{{ url_for('imagem', nome_arquivo=form.foto.data if form.foto.data else 'capa_padrao.jpg') }}">
+        <figcaption>
+          <label class="fileContainer">
+            Mudar Capa
+            {{ form.foto(accept="image/*") }}
+          </label>
+        </figcaption>
+    </figure>
 <fieldset>
-    <div class="form-group">
-    <label for="nome">Nome</label>
-    <input type="text" id="nome" name="nome" class="form-control" value="{{ jogo.nome }}">
-    </div>
-    <div class="form-group">
-    <label for="categoria">Categoria</label>
-    <input type="text" id="categoria" name="categoria" class="form-control" value="{{ jogo.categoria }}">
-    </div>
-    <div class="form-group">
-    <label for="categoria">Console</label>
-    <input type="text" id="console" name="console" class="form-control" value="{{ jogo.console }}">
-    </div>
-    <input type="hidden" id="id" name="id" value="{{ jogo.id }}">
-    <button type="submit" class="btn btn-primary btn-salvar">Salvar</button>
+  <input type="hidden" name="id" value="{{ id }}">
+  {{ form.csrf_token() }}
+  <div class="form-group inputBox">
+    {{ form.nome.label(class="form-label") }}
+    {{ form.nome(class="form-control") }}
+  </div>
+  <div class="form-group inputBox">
+    {{ form.categoria.label(class="form-label") }}
+    {{ form.categoria(class="form-control") }}
+  </div>
+  <div class="form-group inputBox">
+    {{ form.console.label(class="form-label") }}
+    {{ form.console(class="form-control") }}
+  </div>
+  <div class="form-group buttons">
+    {{ form.salvar(class="btn btn-primary") }}
+    <a class="btn btn-danger" href="{{ url_for('index') }}">Voltar</a>
+  </div>
 </fieldset>
 </form>
 {% endblock %}
