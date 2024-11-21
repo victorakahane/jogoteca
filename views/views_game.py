@@ -1,9 +1,11 @@
-from flask import render_template, request, redirect, session, flash, url_for, send_from_directory, abort
-from helpers import FormularioJogo, FormularioUsuario
-from flask_wtf import FlaskForm
-from main import app, db
-from models import Jogos, Usuarios
 import os
+from flask_wtf import FlaskForm
+from flask import (
+    render_template, request, redirect, session, flash, url_for, send_from_directory, abort
+)
+from helpers import FormularioJogo
+from main import app, db
+from models import Jogos
 
 @app.route('/')
 def index():
@@ -20,18 +22,16 @@ def retornar_pagina_cadastro():
 @app.route('/cadastrar', methods=['POST'])
 def cadastrar_jogo():
     form: type[FlaskForm] = FormularioJogo(request.form)
-    
+
     if not form.validate_on_submit():
         flash('Preencha todos os campos obrigatórios.', category='error')
         return redirect(url_for('retornar_pagina_cadastro'))
-    
+
     nome = form.nome.data
     console = form.console.data
     categoria = form.categoria.data
     arquivo = request.files.get('foto')
-    print(arquivo)
-    
-    
+
     if Jogos.query.filter_by(nome=nome).first():
         flash('Jogo já cadastrado.', category='error')
         return redirect(url_for('retornar_pagina_cadastro'))
@@ -42,13 +42,6 @@ def cadastrar_jogo():
     db.session.commit()
 
     if arquivo and arquivo.filename:
-        # Validar extensão do arquivo
-        # arquivo_extensao = os.path.splitext(arquivo.filename)[1].lower()
-        # if arquivo_extensao not in ['.png', '.jpg', '.jpeg']:
-        #     flash('Formato de arquivo inválido. Envie uma imagem PNG, JPG ou JPEG.', category='error')
-        #     db.session.rollback()
-        #     return redirect(url_for('retornar_pagina_cadastro'))
-
         # Gerar nome único para o arquivo
         nome_arquivo = f'capa_{novo_jogo.id}.jpg'
         caminho_arquivo = os.path.join(app.config['UPLOAD_FOLDER'], nome_arquivo)
@@ -63,67 +56,41 @@ def cadastrar_jogo():
     flash('Jogo cadastrado com sucesso!', category='success')
     return redirect(url_for('index'))
 
-@app.route('/login')
-def fazer_login():
-    proxima = request.args.get('proxima', url_for('index'))
-    form = FormularioUsuario()
-    return render_template('login.html', proxima=proxima, form=form)
-
-@app.route('/autenticar', methods=['POST'])
-def autenticar():
-    form: type[FlaskForm] = FormularioUsuario(request.form)
-    input_usuario = form.nickname.data
-    input_senha = form.senha.data
-    usuario = Usuarios.query.filter_by(nickname=input_usuario).first()
-
-    if usuario:
-        if usuario.senha == input_senha:
-            session['usuario_logado'] = input_usuario
-            proxima_pagina = request.form.get('proxima')
-            flash(f'Usuário logado com sucesso: {session["usuario_logado"]}')
-            return redirect(proxima_pagina)
-
-        flash('Senha incorreta, tente novamente')
-        return redirect(url_for('fazer_login'))
-    else:
-        flash('Usuário não cadastrado, tente novamente')
-        return redirect(url_for('fazer_login'))
-
 @app.route('/logout')
 def fazer_logout():
     session['usuario_logado'] = None
     flash('Logout efetuado com sucesso!')
     return redirect(url_for('index'))
 
-@app.route('/editar/<int:id>')
-def editar(id):
-    jogo = Jogos.query.filter_by(id=id).first()
+@app.route('/editar/<int:jogo_id>')
+def editar(jogo_id):
+    jogo = Jogos.query.filter_by(id=jogo_id).first()
     form = FormularioJogo()
     form.nome.data = jogo.nome
     form.categoria.data = jogo.categoria
     form.console.data = jogo.console
     form.foto.data = jogo.caminho_capa
     if 'usuario_logado' not in session or session['usuario_logado'] is None:
-        return redirect(url_for('fazer_login', proxima=url_for('editar', id=id)))
+        return redirect(url_for('fazer_login', proxima=url_for('editar', id=jogo_id)))
     if jogo:
-        return render_template('editar.html', form=form, id=id)
-    
+        return render_template('editar.html', form=form, id=jogo_id)
+
     flash('Jogo não encontrado!', category='error')
     return redirect(url_for('index'))
-    
+
 @app.route('/atualizar', methods=['POST'])
 def atualizar():
     form: type[FlaskForm] = FormularioJogo(request.form)
     jogo_id = request.form.get('id')
     jogo = Jogos.query.filter_by(id=jogo_id).first()
-    
+
     if not jogo:
         flash('Jogo não encontrado!', category='error')
         return redirect(url_for('index'))
     if not form.validate_on_submit():
         flash('Informações inváidas!', category='error')
         return redirect(url_for('editar', id=jogo_id))
-    
+
     arquivo = request.files.get('foto')
     jogo.nome = form.nome.data
     jogo.categoria = form.categoria.data
@@ -133,23 +100,23 @@ def atualizar():
         caminho_arquivo = os.path.join(app.config['UPLOAD_FOLDER'], nome_arquivo)
         arquivo.save(caminho_arquivo)
         jogo.caminho_capa = nome_arquivo
-    
+
     db.session.add(jogo)
     db.session.commit()
     flash('Jogos atualizados!')
     return redirect(url_for('index'))
 
-@app.route('/deletar/<int:id>')
-def deletar(id):
+@app.route('/deletar/<int:jogo_id>')
+def deletar(jogo_id):
     if 'usuario_logado' not in session or session['usuario_logado'] is None:
         return redirect(url_for('login'))
 
     # Buscar o jogo no banco de dados
-    jogo = Jogos.query.get(id)
+    jogo = Jogos.query.get(jogo_id)
     if not jogo:
         flash('Jogo não encontrado!', category='error')
         return redirect(url_for('index'))
-    
+
     caminho_capa = jogo.caminho_capa
 
     try:
@@ -158,13 +125,12 @@ def deletar(id):
         db.session.commit()
         # Verificar se há uma capa associada
         if caminho_capa:
-            caminho_arquivo = os.path.join(app.config['UPLOAD_FOLDER'], caminho_capa)            
+            caminho_arquivo = os.path.join(app.config['UPLOAD_FOLDER'], caminho_capa)
             # Checar se o arquivo existe e deletá-lo
             if os.path.exists(caminho_arquivo):
                 os.remove(caminho_arquivo)
 
         flash('Jogo deletado com sucesso!', category='success')
-
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao excluir o jogo: {str(e)}', category='error')
